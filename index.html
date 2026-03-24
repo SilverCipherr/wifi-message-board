@@ -1,12 +1,594 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <meta charset="utf-8">
-    <title>Redirecting...</title>
-    <!-- Redirect to the frontend directory where the actual web app lives -->
-    <meta http-equiv="refresh" content="0; url=./frontend/index.html">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WiFi Message</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <!-- Load MQTT.js over unpkg -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #080c0e;
+      --surface: #0d1417;
+      --border: #1a2830;
+      --accent: #00e5ff;
+      --accent2: #00ff99;
+      --dim: #2a4050;
+      --text: #c8dde8;
+      --muted: #4a6070;
+      --danger: #ff4466;
+      --mono: 'Share Tech Mono', monospace;
+      --ui: 'Rajdhani', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--ui);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px 40px;
+      background-image:
+        radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0, 229, 255, 0.04) 0%, transparent 70%),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0, 229, 255, 0.03) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0, 229, 255, 0.02) 40px);
+    }
+
+    /* ── LOCK SCREEN ── */
+    #lockScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    #lockScreen h2 {
+      font-family: var(--mono);
+      color: var(--accent);
+      font-size: 1.1rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    #lockScreen .lock-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px 28px;
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 0 60px rgba(0, 229, 255, 0.06);
+    }
+
+    #lockScreen label {
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    #pinInput {
+      background: #0a1015;
+      border: 1px solid var(--dim);
+      border-radius: 8px;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 1.4rem;
+      letter-spacing: 6px;
+      padding: 12px 14px;
+      text-align: center;
+      outline: none;
+      width: 100%;
+      transition: border 0.2s;
+    }
+
+    #pinInput:focus {
+      border-color: var(--accent);
+    }
+
+    #lockErr {
+      font-size: 0.78rem;
+      color: var(--danger);
+      text-align: center;
+      min-height: 16px;
+    }
+
+    #unlockBtn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--ui);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    #unlockBtn:active {
+      opacity: 0.7;
+      transform: scale(0.98);
+    }
+
+    /* ── MAIN APP ── */
+    #app {
+      display: none;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--accent);
+      letter-spacing: 2px;
+    }
+
+    .logo span {
+      color: var(--accent2);
+    }
+
+    .badge {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      color: var(--accent);
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 1px;
+    }
+
+    .badge.online::before {
+      content: '●';
+      color: var(--accent2);
+      margin-right: 5px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.3
+      }
+    }
+
+    /* ── OLED PREVIEW ── */
+    .section-label {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .oled {
+      background: #000;
+      border: 2px solid #1f2f38;
+      border-radius: 10px;
+      padding: 10px 12px 10px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--accent);
+      min-height: 80px;
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      position: relative;
+      box-shadow: inset 0 0 20px rgba(0, 229, 255, 0.04), 0 0 0 1px rgba(0, 229, 255, 0.08);
+    }
+
+    .oled::before {
+      content: 'WIFI Message';
+      display: block;
+      background: rgba(0, 229, 255, 0.9);
+      color: #000;
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      padding: 2px 6px;
+      margin: -10px -12px 8px;
+      border-radius: 7px 7px 0 0;
+    }
+
+    .oled-text {
+      line-height: 1.7;
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+    }
+
+    /* ── COMPOSE ── */
+    .compose-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      background: #0a1015;
+      border: 1px solid var(--dim);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--ui);
+      font-size: 1rem;
+      padding: 12px;
+      resize: none;
+      height: 80px;
+      outline: none;
+      transition: border 0.2s;
+      margin-bottom: 12px;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    textarea::placeholder {
+      color: var(--muted);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 11px;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--ui);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn:active {
+      opacity: 0.7;
+      transform: scale(0.98);
+    }
+
+    .btn-send {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-clear {
+      background: var(--dim);
+      color: var(--muted);
+    }
+
+    .status-bar {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      text-align: center;
+      min-height: 16px;
+      margin-top: 10px;
+      transition: color 0.3s;
+    }
+
+    .ok {
+      color: var(--accent2);
+    }
+
+    .err {
+      color: var(--danger);
+    }
+
+    .info {
+      color: var(--muted);
+    }
+
+    /* ── LOG ── */
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .log-clear-btn {
+      background: none;
+      border: 1px solid var(--dim);
+      color: var(--muted);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      padding: 3px 10px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .log-clear-btn:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .log-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-height: 280px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--dim) transparent;
+    }
+
+    .log-empty {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 30px;
+      letter-spacing: 1px;
+    }
+
+    .log-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px)
+      }
+
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
+
+    .log-item:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      white-space: nowrap;
+      margin-top: 2px;
+      min-width: 52px;
+    }
+
+    .log-text {
+      font-size: 0.88rem;
+      color: var(--text);
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    .log-idx {
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      color: var(--dim);
+      white-space: nowrap;
+      margin-top: 3px;
+      min-width: 20px;
+      text-align: right;
+    }
+  </style>
 </head>
-<body style="background-color: #080c0e; color: #c8dde8; font-family: sans-serif; text-align: center; padding-top: 50px;">
-    <p>Redirecting to the Web Terminal... If you are not redirected automatically, <a href="./frontend/index.html" style="color: #00e5ff;">click here</a>.</p>
+
+<body>
+
+  <!-- LOCK SCREEN -->
+  <div id="lockScreen">
+    <h2>🔒 WiFi <span style="color:var(--accent2)">MESSAGE</span></h2>
+    <div class="lock-box">
+      <label>Enter Access Topic Key</label>
+      <input id="pinInput" type="text" maxlength="32" placeholder="e.g. secret123" autocomplete="off">
+      <div id="lockErr"></div>
+      <button id="unlockBtn" onclick="tryUnlock()">Connect</button>
+    </div>
+    <div style="margin-top: 16px; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 1px;">
+      Made by Prottay
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app">
+    <header>
+      <div class="logo">WiFi <span>MESSAGE</span></div>
+      <div class="badge online" id="hostBadge">CONNECTING...</div>
+    </header>
+
+    <div class="section-label">Display Preview</div>
+    <div class="oled">
+      <div class="oled-text" id="preview">Ready for messages...</div>
+    </div>
+
+    <div class="section-label">Compose Message</div>
+    <div class="compose-box">
+      <textarea id="msg" placeholder="Type a message... (Ctrl+Enter to send)" maxlength="200"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-send" onclick="sendMsg()">▶ Send</button>
+        <button class="btn btn-clear" onclick="clearScreen()">✕ Clear</button>
+      </div>
+      <div class="status-bar info" id="statusBar">Ready</div>
+    </div>
+
+    <div class="log-header">
+      <div class="section-label" style="margin:0">Message Log</div>
+      <button class="log-clear-btn" onclick="clearLog()">Clear Log</button>
+    </div>
+    <div class="log-list" id="logList">
+      <div class="log-empty" id="logEmpty">— No messages yet —</div>
+    </div>
+    
+    <div style="text-align: center; margin-top: 24px; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 1px;">
+      Made by Prottay
+    </div>
+  </div>
+
+  <script>
+    let mqttClient = null;
+    let topicId = '';
+
+    document.getElementById('pinInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') tryUnlock();
+    });
+
+    function tryUnlock() {
+      const pin = document.getElementById('pinInput').value.trim();
+      if (!pin) return;
+
+      document.getElementById('lockErr').textContent = 'Connecting...';
+
+      // Connect to free public broker over WSS
+      mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+      mqttClient.on('connect', () => {
+        topicId = pin;
+        document.getElementById('lockScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('hostBadge').textContent = "BROKER: CONNECTED";
+      });
+
+      mqttClient.on('error', (err) => {
+        document.getElementById('lockErr').textContent = '✗ Connection error: ' + err;
+      });
+    }
+
+    function wrapText(text, maxChars = 21) {
+      const words = text.split(' ');
+      const lines = []; let cur = '';
+      for (const w of words) {
+        if ((cur + (cur ? ' ' : '') + w).length <= maxChars) {
+          cur += (cur ? ' ' : '') + w;
+        } else {
+          if (cur) lines.push(cur);
+          cur = w.substring(0, maxChars);
+        }
+      }
+      if (cur) lines.push(cur);
+      return lines.slice(-4).join('\n');
+    }
+
+    function sendMsg() {
+      const msg = document.getElementById('msg').value.trim();
+      if (!msg || !mqttClient) return;
+      setStatus('Sending...', 'info');
+
+      const payload = JSON.stringify({ action: "MSG", text: msg });
+      mqttClient.publish("wifimsg/" + topicId + "/rx", payload, (err) => {
+        if (err) {
+          setStatus('✗ Failed to send', 'err');
+        } else {
+          document.getElementById('preview').textContent = wrapText(msg);
+          document.getElementById('msg').value = '';
+          setStatus('✓ Sent to display', 'ok');
+          addLogItem(msg);
+        }
+        setTimeout(() => setStatus('Ready', 'info'), 3000);
+      });
+    }
+
+    function clearScreen() {
+      if (!mqttClient) return;
+      const payload = JSON.stringify({ action: "CLEAR" });
+      mqttClient.publish("wifimsg/" + topicId + "/rx", payload, (err) => {
+        if (err) {
+          setStatus('✗ Error', 'err');
+        } else {
+          document.getElementById('preview').textContent = '[Screen cleared]';
+          setStatus('Screen cleared', 'ok');
+          setTimeout(() => setStatus('Ready', 'info'), 2000);
+        }
+      });
+    }
+
+    let logEntries = [];
+
+    function addLogItem(text) {
+      const now = new Date();
+      const ts = now.toTimeString().slice(0, 8);
+      logEntries.unshift({ text, time: ts });
+      renderLog();
+    }
+
+    function renderLog() {
+      const list = document.getElementById('logList');
+      document.getElementById('logEmpty').style.display = logEntries.length ? 'none' : 'block';
+      const existing = list.querySelectorAll('.log-item');
+      existing.forEach(e => e.remove());
+      logEntries.forEach((e, i) => {
+        const div = document.createElement('div');
+        div.className = 'log-item';
+        div.innerHTML = `
+        <div class="log-time">${e.time}</div>
+        <div class="log-text">${escHtml(e.text)}</div>
+        <div class="log-idx">#${logEntries.length - i}</div>`;
+        list.appendChild(div);
+      });
+    }
+
+    function clearLog() {
+      logEntries = [];
+      renderLog();
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function setStatus(msg, cls) {
+      const el = document.getElementById('statusBar');
+      el.textContent = msg;
+      el.className = 'status-bar ' + cls;
+    }
+
+    document.getElementById('msg').addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 'Enter') sendMsg();
+    });
+  </script>
 </body>
+
 </html>
