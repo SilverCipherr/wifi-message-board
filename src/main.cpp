@@ -11,12 +11,12 @@
 #include <ArduinoJson.h>
 
 // ── CONFIG ── change these ───────────────────────────────────
-const char* SSID       = "Your_WiFi_Name";
+const char* SSID       = "Your_WiFI_SSID";
 const char* PASSWORD   = "Your_WiFi_Password";
 
 // The APP_TOKEN serves as the secure MQTT topic path.
 // Changing this ensures no one else controls your ESP32.
-const char* APP_TOKEN  = "YOUR_SECRET_TOKEN"; 
+const char* APP_TOKEN  = "Your_App_Token"; 
 
 const char* MQTT_BROKER = "broker.emqx.io";
 const int   MQTT_PORT   = 1883;
@@ -150,8 +150,6 @@ void reconnect() {
       // Subscribe back to the unique topic
       mqtt.subscribe(subscribeTopic.c_str());
       
-      addLine("Broker Connected!");
-      renderDisplay();
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqtt.state());
@@ -191,8 +189,7 @@ void setup() {
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
   mqtt.setCallback(mqttCallback);
 
-  addLine(WiFi.localIP().toString());
-  renderDisplay();
+  renderDisplay(); // Switch from status screen to main WiFi Message screen
 }
 
 // ─────────────────────────────────────────────────────────────
