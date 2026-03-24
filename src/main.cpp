@@ -11,12 +11,12 @@
 #include <ArduinoJson.h>
 
 // ── CONFIG ── change these ───────────────────────────────────
-const char* SSID       = "Masud";
-const char* PASSWORD   = "masud1234";
+const char* SSID       = "Your_WiFi_Name";
+const char* PASSWORD   = "Your_WiFi_Password";
 
 // The APP_TOKEN serves as the secure MQTT topic path.
 // Changing this ensures no one else controls your ESP32.
-const char* APP_TOKEN  = "0203"; 
+const char* APP_TOKEN  = "YOUR_SECRET_TOKEN"; 
 
 const char* MQTT_BROKER = "broker.emqx.io";
 const int   MQTT_PORT   = 1883;
@@ -129,6 +129,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     clearOLED();
     addLine("Screen cleared");
     renderDisplay();
+  }
+  else if (action && strcmp(action, "PING") == 0) {
+    String txTopic = String("wifimsg/") + APP_TOKEN + "/tx";
+    mqtt.publish(txTopic.c_str(), "{\"status\":\"PONG\"}");
   }
 }
 

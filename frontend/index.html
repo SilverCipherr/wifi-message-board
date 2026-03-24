@@ -487,13 +487,39 @@
 
       mqttClient.on('connect', () => {
         topicId = pin;
-        document.getElementById('lockScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        document.getElementById('hostBadge').textContent = "BROKER: CONNECTED";
+        document.getElementById('lockErr').textContent = 'Verifying hardware connection...';
+        
+        mqttClient.subscribe("wifimsg/" + topicId + "/tx", (err) => {
+          if (!err) {
+            const payload = JSON.stringify({ action: "PING" });
+            mqttClient.publish("wifimsg/" + topicId + "/rx", payload);
+          }
+        });
+
+        // Timeout if no PONG received
+        window.authTimeout = setTimeout(() => {
+          document.getElementById('lockErr').textContent = '✗ Invalid Topic Key or Device Offline';
+          mqttClient.end();
+        }, 5000);
+      });
+
+      mqttClient.on('message', (topic, message) => {
+        if (topic === "wifimsg/" + topicId + "/tx") {
+          try {
+            const doc = JSON.parse(message.toString());
+            if (doc.status === "PONG") {
+              clearTimeout(window.authTimeout);
+              document.getElementById('lockScreen').style.display = 'none';
+              document.getElementById('app').style.display = 'block';
+              document.getElementById('hostBadge').textContent = "BROKER: CONNECTED";
+            }
+          } catch (e) {}
+        }
       });
 
       mqttClient.on('error', (err) => {
         document.getElementById('lockErr').textContent = '✗ Connection error: ' + err;
+        clearTimeout(window.authTimeout);
       });
     }
 

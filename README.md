@@ -1,5 +1,7 @@
 # WiFi OLED Message Terminal (MQTT Edition)
 
+**[🌐 Access the Live Web Dashboard Here](https://silvercipherr.github.io/wifi-message-board/frontend/index.html)**
+
 This is an ESP32-based IoT project that allows you to send dynamic text messages to an SSD1306 OLED display remotely over the internet. The project uses a public MQTT broker (EMQX) as a backend, and features a clean, hacker-style HTML/JS web interface for composing messages.
 
 ## Features
