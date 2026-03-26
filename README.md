@@ -1,6 +1,6 @@
 # WiFi OLED Message Terminal (MQTT Edition)
 
-**[🌐 Access the Live Web Dashboard Here](https://silvercipherr.github.io/wifi-message-board/frontend/index.html)**
+**[🌐 Access the Live Web Dashboard Here](https://wifi-message-board.vercel.app)**
 
 This is an ESP32-based IoT project that allows you to send dynamic text messages to an SSD1306 OLED display remotely over the internet. The project uses a public MQTT broker (EMQX) as a backend, and features a clean, hacker-style HTML/JS web interface for composing messages.
 
@@ -24,7 +24,21 @@ This is an ESP32-based IoT project that allows you to send dynamic text messages
 
 - `src/main.cpp` - The core ESP32 C++ firmware.
 - `platformio.ini` - PlatformIO configuration file including dependencies.
-- `frontend/index.html` - The static frontend web application. 
+- `index.html` - The static frontend web application. 
+- `favicon.png` - Tab icon for the web app.
+
+## Deployment
+
+### Vercel (Recommended)
+
+The frontend web dashboard is deployed on [Vercel](https://vercel.com/).
+
+1. Push this repository to GitHub.
+2. Import the repository in [Vercel](https://vercel.com/new).
+3. Vercel will auto-detect the static site — no build configuration needed.
+4. The dashboard will be live at your Vercel project URL.
+
+> **Note:** Only `index.html` and `favicon.png` are served by Vercel. The ESP32 firmware files (`src/`, `platformio.ini`, etc.) are part of the repository but are not deployed.
 
 ## Setup Instructions
 
@@ -47,7 +61,7 @@ Then, compile and upload the firmware to your ESP32 board. Upon booting, the ESP
 
 ### 2. Launch the Web Frontend
 
-1. Open `frontend/index.html` in any modern web browser (you can double click it or host it on GitHub Pages/Vercel).
+1. Visit the live dashboard at your Vercel deployment URL, or open `index.html` locally in any modern web browser.
 2. The initial "Lock Screen" will appear.
 3. Enter the exact `APP_TOKEN` you compiled into the firmware as your "Access Topic Key".
 4. Click **Connect**. You can now type messages and hit send!
@@ -75,7 +89,7 @@ const int   MQTT_PORT   = 1883; // Standard unencrypted MQTT port
 ```
 
 ### 2. Update the Frontend WebSockets URL
-In order for the web UI to communicate with your broker from a browser, your broker must have **WebSockets** enabled. Open `frontend/index.html` and look for the connection line:
+In order for the web UI to communicate with your broker from a browser, your broker must have **WebSockets** enabled. Open `index.html` and look for the connection line:
 
 ```javascript
 // Connect to free public broker over WSS
